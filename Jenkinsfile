@@ -9,6 +9,26 @@ pipeline {
         skipStagesAfterUnstable()
     }
     stages {
+        stage('Clean workspace') {
+            parallel {
+                stage('amd64') {
+                    agent {
+                        label 'amd64'
+                    }
+                    steps {
+                        cleanWs()
+                    }
+                }
+                stage('arm') {
+                    agent {
+                        label 'arm'
+                    }
+                    steps {
+                        cleanWs()
+                    }
+                }
+            }
+        }
         stage('Docker Images') {
             parallel {
                 stage('amd64') {
