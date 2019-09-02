@@ -1,5 +1,8 @@
 pipeline {
     agent none
+    triggers {
+        cron('@weekly')
+    }
     environment {
         DOCKER_REPO = "stevbev/docker-registry-ui"
         TAG = ""
