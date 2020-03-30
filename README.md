@@ -4,9 +4,11 @@
 
 ### Overview
 
-* Web UI for Docker Registry 2.6+
-* Browse repositories and tags
-* Display Docker image details by layers including both manifests v1 and v2
+* Web UI for Docker Registry
+* Browse namespaces, repositories and tags
+* Display image details by layers
+* Display sub-images of multi-arch or cache type of image
+* Support Manifest v2 schema 1, Manifest v2 schema 2, Manifest List v2 schema 2 and their confusing combinations
 * Fast and small, written on Go
 * Automatically discover an authentication method (basic auth, token service etc.)
 * Caching the list of repositories, tag counts and refreshing in background
@@ -36,8 +38,14 @@ To preserve sqlite db file with event notifications data, add to the command:
 
     -v /local/data:/opt/data
 
+Ensure /local/data is owner by nobody (alpine user id is 65534).
+
 You can also run the container with `--read-only` option, however when using using event listener functionality
-you need to ensure the sqlite db can be written, i.e. mount a folder as listed above.
+you need to ensure the sqlite db can be written, i.e. mount a folder as listed above (rw mode).
+
+To run with a custom TZ:
+
+    -e TZ=America/Los_Angeles
 
 ## Configure event listener on Docker Registry
 
@@ -104,8 +112,30 @@ Note, the cron schedule format includes seconds! See https://godoc.org/github.co
 
 To increase http request verbosity, run container with `-e GOREQUEST_DEBUG=1`.
 
+### About Docker image formats...
+
+Docker image formats and their confusing combinations as supported by this UI:
+
+* Manifest v2 schema 1 only: older format, e.g. created with Docker 1.9.
+* Manifest v2 schema 1 + Manifest v2 schema 2: current format of a single image, the image history are coming from schema 1, should be referenced by repo:tag name.
+* Manifest v2 schema 1 + Manifest List v2 schema 2: multi-arch image format containing digests of sub-images, the image history are coming from schema 1 (no idea from what sub-image it was picked up when created), should be referenced by repo:tag name.
+* Manifest v2 schema 2: current image format referenced by its digest sha256, no image history.
+* Manifest List v2 schema 2: multi-arch image referenced by its digest sha256 or cache image referenced by tag name, no image history.
+
 ### Screenshots
+
+Repository list / home page:
 
 ![image](screenshots/1.png)
 
+Repository tag list:
+
 ![image](screenshots/2.png)
+
+Tag info page:
+
+![image](screenshots/3.png)
+
+Event log page:
+
+![image](screenshots/4.png)

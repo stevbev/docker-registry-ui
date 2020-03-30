@@ -10,11 +10,12 @@ import (
 	"strings"
 
 	"github.com/CloudyKit/jet"
-	"github.com/labstack/echo"
-	"github.com/labstack/echo/middleware"
+	"github.com/labstack/echo/v4"
+	"github.com/labstack/echo/v4/middleware"
 	"github.com/quiq/docker-registry-ui/events"
 	"github.com/quiq/docker-registry-ui/registry"
 	"github.com/robfig/cron"
+	"github.com/sirupsen/logrus"
 	"github.com/tidwall/gjson"
 	"gopkg.in/yaml.v2"
 )
@@ -53,15 +54,22 @@ type apiClient struct {
 
 func main() {
 	var (
-		a           apiClient
-		configFile  string
-		purgeTags   bool
-		purgeDryRun bool
+		a apiClient
+
+		configFile, loggingLevel string
+		purgeTags, purgeDryRun   bool
 	)
 	flag.StringVar(&configFile, "config-file", "config.yml", "path to the config file")
+	flag.StringVar(&loggingLevel, "log-level", "info", "logging level")
 	flag.BoolVar(&purgeTags, "purge-tags", false, "purge old tags instead of running a web server")
 	flag.BoolVar(&purgeDryRun, "dry-run", false, "dry-run for purging task, does not delete anything")
 	flag.Parse()
+
+	if loggingLevel != "info" {
+		if level, err := logrus.ParseLevel(loggingLevel); err == nil {
+			logrus.SetLevel(level)
+		}
+	}
 
 	// Read config file.
 	if _, err := os.Stat(configFile); os.IsNotExist(err) {
@@ -209,11 +217,35 @@ func (a *apiClient) viewTagInfo(c echo.Context) error {
 		repoPath = fmt.Sprintf("%s/%s", namespace, repo)
 	}
 
+	// Retrieve full image info from various versions of manifests
 	sha256, infoV1, infoV2 := a.client.TagInfo(repoPath, tag, false)
-	if infoV1 == "" || infoV2 == "" {
+	sha256list, manifests := a.client.ManifestList(repoPath, tag)
+	if (infoV1 == "" || infoV2 == "") && len(manifests) == 0 {
 		return c.Redirect(http.StatusSeeOther, fmt.Sprintf("%s/%s/%s", a.config.BasePath, namespace, repo))
 	}
 
+	created := gjson.Get(gjson.Get(infoV1, "history.0.v1Compatibility").String(), "created").String()
+	isDigest := strings.HasPrefix(tag, "sha256:")
+	if len(manifests) > 0 {
+		sha256 = sha256list
+	}
+
+	// Gather layers v2
+	var layersV2 []map[string]gjson.Result
+	for _, s := range gjson.Get(infoV2, "layers").Array() {
+		layersV2 = append(layersV2, s.Map())
+	}
+
+	// Gather layers v1
+	var layersV1 []map[string]interface{}
+	for _, s := range gjson.Get(infoV1, "history.#.v1Compatibility").Array() {
+		m, _ := gjson.Parse(s.String()).Value().(map[string]interface{})
+		// Sort key in the map to show the ordered on UI.
+		m["ordered_keys"] = registry.SortedMapKeys(m)
+		layersV1 = append(layersV1, m)
+	}
+
+	// Count image size
 	var imageSize int64
 	if gjson.Get(infoV2, "layers").Exists() {
 		for _, s := range gjson.Get(infoV2, "layers.#.size").Array() {
@@ -225,35 +257,50 @@ func (a *apiClient) viewTagInfo(c echo.Context) error {
 		}
 	}
 
-	var layersV2 []map[string]gjson.Result
-	for _, s := range gjson.Get(infoV2, "layers").Array() {
-		layersV2 = append(layersV2, s.Map())
-	}
-
-	var layersV1 []map[string]interface{}
-	for _, s := range gjson.Get(infoV1, "history.#.v1Compatibility").Array() {
-		m, _ := gjson.Parse(s.String()).Value().(map[string]interface{})
-		// Sort key in the map to show the ordered on UI.
-		m["ordered_keys"] = registry.SortedMapKeys(m)
-		layersV1 = append(layersV1, m)
-	}
-
+	// Count layers
 	layersCount := len(layersV2)
 	if layersCount == 0 {
 		layersCount = len(gjson.Get(infoV1, "fsLayers").Array())
 	}
 
+	// Gather sub-image info of multi-arch or cache image
+	var digestList []map[string]interface{}
+	for _, s := range manifests {
+		r, _ := gjson.Parse(s.String()).Value().(map[string]interface{})
+		if s.Get("mediaType").String() == "application/vnd.docker.distribution.manifest.v2+json" {
+			// Sub-image of the specific arch.
+			_, dInfoV1, _ := a.client.TagInfo(repoPath, s.Get("digest").String(), true)
+			var dSize int64
+			for _, d := range gjson.Get(dInfoV1, "layers.#.size").Array() {
+				dSize = dSize + d.Int()
+			}
+			r["size"] = dSize
+			// Create link here because there is a bug with jet template when referencing a value by map key in the "if" condition under "range".
+			if r["mediaType"] == "application/vnd.docker.distribution.manifest.v2+json" {
+				r["digest"] = fmt.Sprintf(`<a href="%s/%s/%s/%s">%s</a>`, a.config.BasePath, namespace, repo, r["digest"], r["digest"])
+			}
+		} else {
+			// Sub-image of the cache type.
+			r["size"] = s.Get("size").Int()
+		}
+		r["ordered_keys"] = registry.SortedMapKeys(r)
+		digestList = append(digestList, r)
+	}
+
+	// Populate template vars
 	data := jet.VarMap{}
 	data.Set("namespace", namespace)
 	data.Set("repo", repo)
+	data.Set("tag", tag)
+	data.Set("repoPath", repoPath)
 	data.Set("sha256", sha256)
 	data.Set("imageSize", imageSize)
-	data.Set("tag", gjson.Get(infoV1, "tag").String())
-	data.Set("repoPath", gjson.Get(infoV1, "name").String())
-	data.Set("created", gjson.Get(gjson.Get(infoV1, "history.0.v1Compatibility").String(), "created").String())
+	data.Set("created", created)
 	data.Set("layersCount", layersCount)
 	data.Set("layersV2", layersV2)
 	data.Set("layersV1", layersV1)
+	data.Set("isDigest", isDigest)
+	data.Set("digestList", digestList)
 
 	return c.Render(http.StatusOK, "tag_info.html", data)
 }
