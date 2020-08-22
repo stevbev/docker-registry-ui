@@ -2,6 +2,7 @@ pipeline {
     agent none
     triggers {
         cron('@weekly')
+        pollSCM('*/15 * * * *')
     }
     environment {
         DOCKER_REPO = "stevbev/docker-registry-ui"
