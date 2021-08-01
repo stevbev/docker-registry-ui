@@ -12,7 +12,7 @@ RUN go test -v ./registry && \
     go build -o /opt/docker-registry-ui *.go
 
 
-FROM alpine:3.13
+FROM alpine:3.12
 
 WORKDIR /opt
 RUN apk add --no-cache ca-certificates tzdata && \
