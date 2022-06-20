@@ -10,7 +10,6 @@ pipeline {
         IMAGE_ARM = ""
         IMAGE_ARM64 = ""
         REGISTRY_CREDENTIAL = "dockerHub"
-        REGISTRY_URL = "stevbev/docker-registry-ui"
         TAG = ""
         VERSION_FILE = "version.go"
     }
@@ -91,7 +90,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            docker.withRegistry(REGISTRY_URL, REGISTRY_CREDENTIAL) {
+                            docker.withRegistry('', REGISTRY_CREDENTIAL) {
                                 IMAGE_AMD64.push()
                             }
                         }
@@ -103,7 +102,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            docker.withRegistry(REGISTRY_URL, REGISTRY_CREDENTIAL) {
+                            docker.withRegistry('', REGISTRY_CREDENTIAL) {
                                 IMAGE_ARM.push()
                             }
                         }
@@ -115,7 +114,7 @@ pipeline {
                     }
                     steps {
                         script {
-                            docker.withRegistry(REGISTRY_URL, REGISTRY_CREDENTIAL) {
+                            docker.withRegistry('', REGISTRY_CREDENTIAL) {
                                 IMAGE_ARM64.push()
                             }
                         }
@@ -129,7 +128,7 @@ pipeline {
             }
             steps {
                 script {
-                    docker.withRegistry(REGISTRY_URL, REGISTRY_CREDENTIAL) {
+                    docker.withRegistry('', REGISTRY_CREDENTIAL) {
                         TAG = sh(returnStdout: true, script: "grep -i 'version' ${VERSION_FILE} | sed \"s/[^0-9.]//g\"").trim()
                         sh(script: "docker manifest create ${DOCKER_REPO}:${TAG} ${DOCKER_REPO}:${TAG}-amd64 ${DOCKER_REPO}:${TAG}-arm ${DOCKER_REPO}:${TAG}-arm64")
                         sh(script: "docker manifest inspect ${DOCKER_REPO}:${TAG}")
