@@ -10,7 +10,7 @@ pipeline {
         IMAGE_ARM = ""
         IMAGE_ARM64 = ""
         REGISTRY_CREDENTIAL = "dockerHub"
-        REGISTRY_URL = " "
+        REGISTRY_URL = "stevbev/docker-registry-ui"
         TAG = ""
         VERSION_FILE = "version.go"
     }
