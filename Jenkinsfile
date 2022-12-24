@@ -27,14 +27,6 @@ pipeline {
                         cleanWs()
                     }
                 }
-                stage('arm') {
-                    agent {
-                        label 'arm'
-                    }
-                    steps {
-                        cleanWs()
-                    }
-                }
                 stage('arm64') {
                     agent {
                         label 'arm64'
@@ -55,17 +47,6 @@ pipeline {
                         script {
                             TAG = sh(returnStdout: true, script: "grep -i 'version' ${VERSION_FILE} | sed \"s/[^0-9.]//g\"").trim()
                             IMAGE_AMD64 = docker.build("${DOCKER_REPO}:${TAG}-amd64", "-f Dockerfile .")
-                        }
-                    }
-                }
-                stage('arm') {
-                    agent {
-                        label 'arm'
-                    }
-                    steps {
-                        script {
-                            TAG = sh(returnStdout: true, script: "grep -i 'version' ${VERSION_FILE} | sed \"s/[^0-9.]//g\"").trim()
-                            IMAGE_ARM = docker.build("${DOCKER_REPO}:${TAG}-arm", "-f Dockerfile .")
                         }
                     }
                 }
@@ -96,18 +77,6 @@ pipeline {
                         }
                     }
                 }
-                stage('arm') {
-                    agent {
-                        label 'arm'
-                    }
-                    steps {
-                        script {
-                            docker.withRegistry('', REGISTRY_CREDENTIAL) {
-                                IMAGE_ARM.push()
-                            }
-                        }
-                    }
-                }
                 stage('arm64') {
                     agent {
                         label 'arm64'
@@ -130,10 +99,10 @@ pipeline {
                 script {
                     docker.withRegistry('', REGISTRY_CREDENTIAL) {
                         TAG = sh(returnStdout: true, script: "grep -i 'version' ${VERSION_FILE} | sed \"s/[^0-9.]//g\"").trim()
-                        sh(script: "docker manifest create ${DOCKER_REPO}:${TAG} ${DOCKER_REPO}:${TAG}-amd64 ${DOCKER_REPO}:${TAG}-arm ${DOCKER_REPO}:${TAG}-arm64")
+                        sh(script: "docker manifest create ${DOCKER_REPO}:${TAG} ${DOCKER_REPO}:${TAG}-amd64 ${DOCKER_REPO}:${TAG}-arm64")
                         sh(script: "docker manifest inspect ${DOCKER_REPO}:${TAG}")
                         sh(script: "docker manifest push -p ${DOCKER_REPO}:${TAG}")
-                        sh(script: "docker manifest create ${DOCKER_REPO}:latest ${DOCKER_REPO}:${TAG}-amd64 ${DOCKER_REPO}:${TAG}-arm ${DOCKER_REPO}:${TAG}-arm64")
+                        sh(script: "docker manifest create ${DOCKER_REPO}:latest ${DOCKER_REPO}:${TAG}-amd64 ${DOCKER_REPO}:${TAG}-arm64")
                         sh(script: "docker manifest inspect ${DOCKER_REPO}:latest")
                         sh(script: "docker manifest push -p ${DOCKER_REPO}:latest")
                     }
