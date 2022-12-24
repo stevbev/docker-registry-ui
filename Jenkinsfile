@@ -7,7 +7,6 @@ pipeline {
     environment {
         DOCKER_REPO = "stevbev/docker-registry-ui"
         IMAGE_AMD64 = ""
-        IMAGE_ARM = ""
         IMAGE_ARM64 = ""
         REGISTRY_CREDENTIAL = "dockerHub"
         TAG = ""
