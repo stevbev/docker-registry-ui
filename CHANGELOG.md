@@ -1,5 +1,16 @@
 ## Changelog
 
+### UNRELEASED
+
+* Add an option to disable counting of tags if it is very slow: `-disable-count-tags`
+* Add an option to specify a comma-separated list of repos to purge: `-purge-from-repos`
+
+### 0.9.7 (2024-02-21)
+
+* Fix timezone support: now when running a container with `TZ` env var, e.g. "-e TZ=America/Los_Angeles", it will be reflected everywhere on UI.
+* Amend tag info page: add long line break, better format a caption column.
+* Upgrade Go version to 1.22, alpine to 3.19 and other dependencies.
+
 ### 0.9.6 (2023-03-30)
 
 * Upgrade Go version to 1.20.2, alpine to 3.17 and other dependencies.
